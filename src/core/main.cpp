@@ -15,6 +15,9 @@ Preferences boot_prefs;
 bool is_ap_mode = false;
 bool clear_ap_flag_pending = false;
 uint32_t boot_time_ms = 0;
+#ifdef BOARD_HAS_LCD
+String g_wifi_ssid;
+#endif
 
 // Calcola lo stato diagnostico del sistema a partire dallo stato Wi-Fi e UPS
 LedState computeSystemState(bool wifiConnected, bool upsConnected) {
@@ -37,8 +40,16 @@ void setup() {
     delay(1000); // Piccolo delay per stabilizzare la connessione seriale
     AppLogger::log("INFO", "\n--- ESP32 NUT Server Initialized ---");
 
+#ifdef BOARD_HAS_LCD
+    // The Elecrow board has no physical NeoPixel, and its power pin (GPIO38)
+    // is this board's LCD backlight pin -- so skip the diagnostic LED
+    // entirely here rather than have two subsystems claim the same pin.
+    // The on-screen status dots (built into LcdDisplay) take over its job.
+    lcd_display.begin();
+#else
     // Inizializzazione del LED diagnostico
     diagnostic_led.begin(LED_BUILTIN_PIN);
+#endif
 
     // Gestione NVS flag per AP manuale
     boot_prefs.begin("boot_state", false);
@@ -62,12 +73,18 @@ void setup() {
         network_mgr.beginAP("NUT_ESP32_Config", "12345678");
         web_server.setUPS(&usb_ups);
         web_server.begin(true);
+#ifdef BOARD_HAS_LCD
+        lcd_display.showApMode("NUT_ESP32_Config", "12345678");
+#endif
     } else {
         is_ap_mode = false;
         AppLogger::log("INFO", "[MAIN] Configuration loaded successfully.");
         // Stampa parametri per verifica
         WifiConfig wifi = config_mgr.getWifiConfig();
         NutConfig nut = config_mgr.getNutConfig();
+#ifdef BOARD_HAS_LCD
+        g_wifi_ssid = wifi.ssid;
+#endif
         AppLogger::log("INFO", "[MAIN] Wi-Fi SSID: %s\n", wifi.ssid.c_str());
         AppLogger::log("INFO", "[MAIN] NUT UPS Name: %s\n", nut.ups_name.c_str());
         
@@ -121,6 +138,10 @@ void loop() {
     network_mgr.loop();
     usb_ups.loop();
 
+#ifdef BOARD_HAS_LCD
+    lcd_display.loop();  // pump LVGL's timer/redraw handler every iteration
+#endif
+
     // Se la configurazione non è valida, rimaniamo in modalità di attesa sicura
     if (!config_mgr.isValid()) {
         static uint32_t last_safe_print = 0;
@@ -128,9 +149,13 @@ void loop() {
             last_safe_print = now;
             AppLogger::log("WARN", "[MAIN] WARNING: System in safe waiting mode. Configuration missing or invalid!");
         }
-        
+
+#ifndef BOARD_HAS_LCD
         diagnostic_led.setState(computeSystemState(network_mgr.isConnected(), usb_ups.isConnected()));
         diagnostic_led.update();
+#endif
+        // Note: while in this state is_ap_mode is already true and the LCD
+        // (if present) is already showing the setup screen from setup().
         delay(10);
         return;
     }
@@ -146,9 +171,19 @@ void loop() {
                       usb_ups.getUPSData()->getFloat("output.voltage"));
     }
 
+#ifdef BOARD_HAS_LCD
+    // Refresh the on-screen dashboard a few times a second -- data comes
+    // straight from usb_ups in-process, no network round trip needed.
+    static uint32_t last_lcd_update = 0;
+    if (now - last_lcd_update >= 1000) {
+        last_lcd_update = now;
+        lcd_display.updateDashboard(&usb_ups, network_mgr.isConnected(), g_wifi_ssid);
+    }
+#else
     // Aggiornamento stato LED diagnostico
     diagnostic_led.setState(computeSystemState(network_mgr.isConnected(), usb_ups.isConnected()));
     diagnostic_led.update();
+#endif
 
     delay(10);
 }

@@ -6,6 +6,9 @@
 #include "network/network_manager.h"
 #include "NUTServer.h"
 #include "DiagnosticLED.h"
+#ifdef BOARD_HAS_LCD
+#include "LcdDisplay.h"
+#endif
 
 // Definizioni globali ed intestazioni del firmware
 #define MONITOR_BAUD_RATE 115200
