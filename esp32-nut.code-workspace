@@ -2,6 +2,10 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"name": "ESP32-NUT-LCD",
+			"path": "../../PlatformIO/Projects/ESP32-NUT-LCD"
 		}
 	],
 	"settings": {}
