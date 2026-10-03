@@ -3,6 +3,7 @@
 #include <lvgl.h>
 #include <math.h>
 #include <esp_heap_caps.h>
+#include <WiFi.h>
 
 #include "lgfx_config.h"
 
@@ -74,6 +75,7 @@ static lv_obj_t *s_dot_live;
 static lv_obj_t *s_dot_wifi;
 static lv_obj_t *s_dot_ups;
 static lv_obj_t *s_lbl_wifi;
+static lv_obj_t *s_lbl_ip;
 static lv_obj_t *s_lbl_ups;
 static lv_obj_t *s_lbl_status_value;
 static StatCard s_card_batt, s_card_load, s_card_runtime, s_card_power;
@@ -184,9 +186,9 @@ static void build_dashboard_screen() {
   lv_obj_set_style_text_font(s_lbl_status_value, &lv_font_montserrat_32, 0);
   lv_obj_align(s_lbl_status_value, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
-  const lv_coord_t gx = 6, gy = 88, gap = 6;
+  const lv_coord_t gx = 6, gy = 86, gap = 4;
   const lv_coord_t gw = (LCD_H_RES - gx * 2 - gap) / 2;
-  const lv_coord_t gh = 50;
+  const lv_coord_t gh = 44;
 
   s_card_batt = make_stat_card(s_screen_dashboard, gx, gy, gw, gh, "BATTERY CHARGE");
   s_card_load = make_stat_card(s_screen_dashboard, gx + gw + gap, gy, gw, gh, "UPS LOAD");
@@ -195,20 +197,26 @@ static void build_dashboard_screen() {
       make_stat_card(s_screen_dashboard, gx + gw + gap, gy + gh + gap, gw, gh, "REAL POWER");
 
   s_dot_wifi = make_dot(s_screen_dashboard);
-  lv_obj_align(s_dot_wifi, LV_ALIGN_TOP_LEFT, 8, 202);
+  lv_obj_align(s_dot_wifi, LV_ALIGN_TOP_LEFT, 8, 188);
   s_lbl_wifi = lv_label_create(s_screen_dashboard);
   lv_label_set_text(s_lbl_wifi, "Wi-Fi: --");
   lv_obj_set_style_text_color(s_lbl_wifi, COL_LABEL, 0);
   lv_obj_set_style_text_font(s_lbl_wifi, &lv_font_montserrat_14, 0);
-  lv_obj_align(s_lbl_wifi, LV_ALIGN_TOP_LEFT, 22, 200);
+  lv_obj_align(s_lbl_wifi, LV_ALIGN_TOP_LEFT, 22, 186);
+
+  s_lbl_ip = lv_label_create(s_screen_dashboard);
+  lv_label_set_text(s_lbl_ip, "IP: --");
+  lv_obj_set_style_text_color(s_lbl_ip, COL_LABEL, 0);
+  lv_obj_set_style_text_font(s_lbl_ip, &lv_font_montserrat_14, 0);
+  lv_obj_align(s_lbl_ip, LV_ALIGN_TOP_LEFT, 22, 204);
 
   s_dot_ups = make_dot(s_screen_dashboard);
-  lv_obj_align(s_dot_ups, LV_ALIGN_TOP_LEFT, 8, 220);
+  lv_obj_align(s_dot_ups, LV_ALIGN_TOP_LEFT, 8, 224);
   s_lbl_ups = lv_label_create(s_screen_dashboard);
   lv_label_set_text(s_lbl_ups, "UPS: --");
   lv_obj_set_style_text_color(s_lbl_ups, COL_LABEL, 0);
   lv_obj_set_style_text_font(s_lbl_ups, &lv_font_montserrat_14, 0);
-  lv_obj_align(s_lbl_ups, LV_ALIGN_TOP_LEFT, 22, 218);
+  lv_obj_align(s_lbl_ups, LV_ALIGN_TOP_LEFT, 22, 222);
 }
 
 static void build_apmode_screen() {
@@ -318,6 +326,9 @@ void LcdDisplay::updateDashboard(const IUSBHostUPS *ups, bool wifiConnected,
   String wtxt = "Wi-Fi: " + (wifiConnected ? wifiSsid : String("disconnected"));
   lv_label_set_text(s_lbl_wifi, wtxt.c_str());
   set_dot_color(s_dot_wifi, wifiConnected ? COL_GREEN : COL_RED);
+
+  String iptxt = "IP: " + (wifiConnected ? WiFi.localIP().toString() : String("--"));
+  lv_label_set_text(s_lbl_ip, iptxt.c_str());
 
   if (!ups || !ups->isConnected()) {
     lv_label_set_text(s_lbl_ups, "UPS: disconnected");
